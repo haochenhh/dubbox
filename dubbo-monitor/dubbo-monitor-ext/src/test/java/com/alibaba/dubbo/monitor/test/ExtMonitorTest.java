@@ -2,8 +2,6 @@ package com.alibaba.dubbo.monitor.test;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Random;
 
 import org.junit.Test;
@@ -15,10 +13,8 @@ import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorFactory;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.monitor.ext.ExtMonitor;
-import com.alibaba.dubbo.monitor.ext.ExtMonitorFactroy;
 import com.alibaba.dubbo.monitor.support.AbstractMonitorFactory;
 import com.alibaba.dubbo.monitor.support.MonitorFilter;
-import com.alibaba.dubbo.monitor.support.MonitorFilterTest;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Result;
@@ -28,9 +24,9 @@ import com.alibaba.dubbo.rpc.RpcInvocation;
 
 public class ExtMonitorTest {
 
-	private volatile URL lastStatistics;
+//	private volatile URL lastStatistics;
 
-	private volatile Invocation lastInvocation;
+//	private volatile Invocation lastInvocation;
 
 	private Random random = new Random();
 
@@ -41,9 +37,10 @@ public class ExtMonitorTest {
 
 		public URL getUrl() {
 			try {
-				return URL.valueOf("dubbo://" + NetUtils.getLocalHost() + ":20880?" + Constants.APPLICATION_KEY
-						+ "=abc&" + Constants.SIDE_KEY + "=" + Constants.CONSUMER_SIDE + "&" + Constants.MONITOR_KEY
-						+ "=" + URLEncoder.encode("dubbo://" + NetUtils.getLocalHost() + ":7070", "UTF-8"));
+				return URL.valueOf("dubbo://" + NetUtils.getLocalHost() + ":20880?" + "interval=10000&"
+						+ Constants.APPLICATION_KEY + "=abc&" + Constants.SIDE_KEY + "=" + Constants.CONSUMER_SIDE + "&"
+						+ Constants.MONITOR_KEY + "="
+						+ URLEncoder.encode("dubbo://" + NetUtils.getLocalHost() + ":7070", "UTF-8"));
 			} catch (UnsupportedEncodingException e) {
 				throw new IllegalStateException(e.getMessage(), e);
 			}
@@ -54,7 +51,7 @@ public class ExtMonitorTest {
 		}
 
 		public Result invoke(Invocation invocation) throws RpcException {
-			lastInvocation = invocation;
+//			lastInvocation = invocation;
 			try {
 				Thread.sleep(random.nextInt(1000));
 			} catch (InterruptedException e) {

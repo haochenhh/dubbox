@@ -59,14 +59,14 @@ public class CountUtils {
 				BufferedReader reader = new BufferedReader(new FileReader(file));
 				try {
 					int times = 0;
-					int count = 0;
+					long count = 0;
 					String line;
 					while ((line = reader.readLine()) != null) {
 						int i = line.indexOf(" ");
 						if (i > 0) {
 							line = line.substring(i + 1).trim();
 							if (NUMBER_PATTERN.matcher(line).matches()) {
-								int value = Integer.parseInt(line);
+								long value = Long.parseLong(line);
 								times++;
 								if (op == MAX) {
 									count = Math.max(count, value);

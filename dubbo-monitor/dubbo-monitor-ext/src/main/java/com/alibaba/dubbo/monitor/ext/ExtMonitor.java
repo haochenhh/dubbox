@@ -1,5 +1,6 @@
 package com.alibaba.dubbo.monitor.ext;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,26 +18,20 @@ import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.rpc.Invoker;
-import com.codahale.metrics.ExponentiallyDecayingReservoir;
-import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 
 /**
  * 
- * @author loda
+ * @author minjun@youku.com
  *
  */
 public class ExtMonitor implements Monitor {
 
 	private static final Logger logger = LoggerFactory.getLogger(ExtMonitor.class);
 
-	private static final int LENGTH = 10;
-
 	// 定时任务执行器
 	private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3,
 			new NamedThreadFactory("DubboMonitorSendTimer", true));
-
-	private volatile Histogram histogram = newHistogram();
 
 	// 统计信息收集定时器
 	private final ScheduledFuture<?> sendFuture;
@@ -47,7 +42,7 @@ public class ExtMonitor implements Monitor {
 
 	private final long monitorInterval;
 
-	private final ConcurrentMap<Statistics, AtomicReference<long[]>> statisticsMap = new ConcurrentHashMap<Statistics, AtomicReference<long[]>>();
+	private final ConcurrentMap<Statistics, AtomicReference<StatisticsData>> statisticsMap = new ConcurrentHashMap<Statistics, AtomicReference<StatisticsData>>();
 
 	public ExtMonitor(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
 		this.monitorInvoker = monitorInvoker;
@@ -71,21 +66,23 @@ public class ExtMonitor implements Monitor {
 			logger.info("Send statistics to monitor " + getUrl());
 		}
 		String timestamp = String.valueOf(System.currentTimeMillis());
-		for (Map.Entry<Statistics, AtomicReference<long[]>> entry : statisticsMap.entrySet()) {
+		for (Map.Entry<Statistics, AtomicReference<StatisticsData>> entry : statisticsMap.entrySet()) {
 			// 获取已统计数据
 			Statistics statistics = entry.getKey();
-			AtomicReference<long[]> reference = entry.getValue();
-			long[] numbers = reference.get();
-			long success = numbers[0];
-			long failure = numbers[1];
-			long input = numbers[2];
-			long output = numbers[3];
-			long elapsed = numbers[4];
-			long concurrent = numbers[5];
-			long maxInput = numbers[6];
-			long maxOutput = numbers[7];
-			long maxElapsed = numbers[8];
-			long maxConcurrent = numbers[9];
+			AtomicReference<StatisticsData> reference = entry.getValue();
+			StatisticsData data = reference.get();
+			long success = data.getSuccess();
+			long failure = data.getFailure();
+			long input = data.getInput();
+			long output = data.getOutput();
+			long elapsed = data.getElapsed();
+			long concurrent = data.getConcurrent();
+			long maxInput = data.getMaxInput();
+			long maxOutput = data.getMaxOutput();
+			long maxElapsed = data.getMaxElapsed();
+			long maxConcurrent = data.getMaxConcurrent();
+			// 获取直方分布的快照
+			Snapshot snapshot = data.getHistogram().getSnapshot();
 
 			// 发送汇总信息
 			URL url = statistics.getUrl().addParameters(//
@@ -100,44 +97,41 @@ public class ExtMonitor implements Monitor {
 					MonitorService.MAX_OUTPUT, String.valueOf(maxOutput), //
 					MonitorService.MAX_ELAPSED, String.valueOf(maxElapsed), //
 					MonitorService.MAX_CONCURRENT, String.valueOf(maxConcurrent), //
-					MonitorService.PERCENT75_KEY, getPercentileString(0.75), //
-					MonitorService.PERCENT90_KEY, getPercentileString(0.90), //
-					MonitorService.PERCENT95_KEY, getPercentileString(0.95), //
-					MonitorService.PERCENT98_KEY, getPercentileString(0.98), //
-					MonitorService.PERCENT99_KEY, getPercentileString(0.99), //
-					MonitorService.PERCENT999_KEY, getPercentileString(0.999)//
+					MonitorService.PERCENT75_KEY, String.valueOf(snapshot.getValue(0.75)), //
+					MonitorService.PERCENT90_KEY, String.valueOf(snapshot.getValue(0.90)), //
+					MonitorService.PERCENT95_KEY, String.valueOf(snapshot.getValue(0.95)), //
+					MonitorService.PERCENT98_KEY, String.valueOf(snapshot.getValue(0.98)), //
+					MonitorService.PERCENT99_KEY, String.valueOf(snapshot.getValue(0.99)), //
+					MonitorService.PERCENT999_KEY, String.valueOf(snapshot.getValue(0.999))//
 			);
 			// monitorService.collect(url);
+			System.out.println(Arrays.toString(snapshot.getValues()));
 			System.out.println(url);
 
-			histogram = newHistogram();
-
-			// 减掉已统计数据
-			long[] current;
-			long[] update = new long[LENGTH];
+			// 减去上次统计的信息
+			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
+			StatisticsData current;
+			StatisticsData update = new StatisticsData();
 			do {
 				current = reference.get();
 				if (current == null) {
-					update[0] = 0;
-					update[1] = 0;
-					update[2] = 0;
-					update[3] = 0;
-					update[4] = 0;
-					update[5] = 0;
+					update.setSuccess(0);
+					update.setFailure(0);
+					update.setInput(0);
+					update.setOutput(0);
+					update.setElapsed(0);
+					update.setConcurrent(0);
 				} else {
-					update[0] = current[0] - success;
-					update[1] = current[1] - failure;
-					update[2] = current[2] - input;
-					update[3] = current[3] - output;
-					update[4] = current[4] - elapsed;
-					update[5] = current[5] - concurrent;
+					update.setSuccess(current.getSuccess() - success);
+					update.setFailure(current.getFailure() - failure);
+					update.setInput(current.getInput() - input);
+					update.setOutput(current.getOutput() - output);
+					update.setElapsed(current.getElapsed() - elapsed);
+					update.setConcurrent(current.getConcurrent() - concurrent);
 				}
+				update.initHistogram();
 			} while (!reference.compareAndSet(current, update));
 		}
-	}
-
-	private Histogram newHistogram() {
-		return new Histogram(new ExponentiallyDecayingReservoir());
 	}
 
 	public void collect(URL url) {
@@ -150,41 +144,45 @@ public class ExtMonitor implements Monitor {
 		int concurrent = url.getParameter(MonitorService.CONCURRENT, 0);
 		// 初始化原子引用
 		Statistics statistics = new Statistics(url);
-		AtomicReference<long[]> reference = statisticsMap.get(statistics);
+		AtomicReference<StatisticsData> reference = statisticsMap.get(statistics);
 		if (reference == null) {
-			statisticsMap.putIfAbsent(statistics, new AtomicReference<long[]>());
+			statisticsMap.putIfAbsent(statistics, new AtomicReference<StatisticsData>());
 			reference = statisticsMap.get(statistics);
 		}
-		// 统计延迟百分比
-		handleRequest(elapsed);
 
 		// CompareAndSet并发加入统计数据
-		long[] current;
-		long[] update = new long[LENGTH];
+		// 当前数据，cas返回false时，current不会被修改
+		StatisticsData current;
+		// 新数据
+		StatisticsData update = new StatisticsData();
 		do {
 			current = reference.get();
 			if (current == null) {
-				update[0] = success;
-				update[1] = failure;
-				update[2] = input;
-				update[3] = output;
-				update[4] = elapsed;
-				update[5] = concurrent;
-				update[6] = input;
-				update[7] = output;
-				update[8] = elapsed;
-				update[9] = concurrent;
+				update.setSuccess(success);
+				update.setFailure(failure);
+				update.setInput(input);
+				update.setOutput(output);
+				update.setElapsed(elapsed);
+				update.setConcurrent(concurrent);
+				update.setMaxInput(input);
+				update.setMaxOutput(output);
+				update.setMaxElapsed(elapsed);
+				update.setMaxConcurrent(concurrent);
+				update.initHistogram();
 			} else {
-				update[0] = current[0] + success;
-				update[1] = current[1] + failure;
-				update[2] = current[2] + input;
-				update[3] = current[3] + output;
-				update[4] = current[4] + elapsed;
-				update[5] = (current[5] + concurrent) / 2;
-				update[6] = current[6] > input ? current[6] : input;
-				update[7] = current[7] > output ? current[7] : output;
-				update[8] = current[8] > elapsed ? current[8] : elapsed;
-				update[9] = current[9] > concurrent ? current[9] : concurrent;
+				update.setSuccess(current.getSuccess() + success);
+				update.setFailure(current.getFailure() + failure);
+				update.setInput(current.getInput() + input);
+				update.setOutput(current.getOutput() + output);
+				update.setElapsed(current.getElapsed() + elapsed);
+				update.setConcurrent((current.getConcurrent() + concurrent) / 2);
+				update.setMaxInput(Math.max(current.getMaxInput(), input));
+				update.setMaxOutput(Math.max(current.getMaxOutput(), output));
+				update.setMaxElapsed(Math.max(current.getMaxElapsed(), elapsed));
+				update.setMaxConcurrent(Math.max(current.getMaxConcurrent(), concurrent));
+				// 统计百分比
+				update.setHistogram(current.getHistogram());
+				update.updateHistogram(elapsed);
 			}
 		} while (!reference.compareAndSet(current, update));
 	}
@@ -208,26 +206,6 @@ public class ExtMonitor implements Monitor {
 			logger.error("Unexpected error occur at cancel sender timer, cause: " + t.getMessage(), t);
 		}
 		monitorInvoker.destroy();
-	}
-
-	private String getPercentileString(double quantile) {
-		return String.valueOf(getPercentileInt(quantile));
-	}
-
-	private int getPercentileInt(double quantile) {
-		return (int) getPercentile(quantile);
-	}
-
-	private double getPercentile(double quantile) {
-		return getSnapShot().getValue(quantile);
-	}
-
-	private Snapshot getSnapShot() {
-		return histogram.getSnapshot();
-	}
-
-	private void handleRequest(long elapsed) {
-		histogram.update(elapsed);
 	}
 
 }
