@@ -72,16 +72,16 @@ public class DemoJavaConfigAction {
 
 //        System.out.println(">>>>> Total time consumed:" + (System.currentTimeMillis() - start));
 
-        try {
-            bidService.throwNPE();
-            System.out.println("ERROR: no exception found");
-        } catch (NullPointerException e) {
-            System.out.println("SUCCESS: caught exception " + e.getClass());
-        }
-
-        User user = new User(1L, "larrypage");
-        System.out.println("SUCESS: registered user with id " + anotherUserRestService.registerUser(user).getId());
-
-        System.out.println("SUCESS: got user " + anotherUserRestService.getUser(1L));
+//        try {
+//            bidService.throwNPE();
+//            System.out.println("ERROR: no exception found");
+//        } catch (NullPointerException e) {
+//            System.out.println("SUCCESS: caught exception " + e.getClass());
+//        }
+//
+//        User user = new User(1L, "larrypage");
+//        System.out.println("SUCESS: registered user with id " + anotherUserRestService.registerUser(user).getId());
+//
+//        System.out.println("SUCESS: got user " + anotherUserRestService.getUser(1L));
     }
 }

@@ -13,13 +13,15 @@
 		<property name="locations">
 			<list>
 				<value>/WEB-INF/dubbo.properties</value>
-				<value>file://${user.home}/dubbo.properties</value>
+				<!-- <value>file://${user.home}/dubbo.properties</value> -->
 			</list>
 		</property>
 	</bean>
 	
 	<dubbo:application name="dubbo-admin" />
 
+	<!-- <dubbo:registry address="${dubbo.registry.address}" check="false" file="false" /> -->
+	
 	<dubbo:registry address="${dubbo.registry.address}" check="false" file="false" />
 
 	<dubbo:reference id="registryService" interface="com.alibaba.dubbo.registry.RegistryService" check="false" />

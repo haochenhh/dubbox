@@ -28,7 +28,7 @@
 	<dubbo:application name="dubbo_provider" />
 
 	<!-- 服务提供者全局配置 -->
-	<dubbo:protocol name="dubbo" port="20885"/>
+	<dubbo:protocol name="dubbo" port="20885" host="10.10.23.246"/>
 
 	<!-- 服务提供者暴露服务配置 -->
 	<dubbo:service id="helloService" interface="com.alibaba.dubbo.rpc.benchmark.DemoService"
