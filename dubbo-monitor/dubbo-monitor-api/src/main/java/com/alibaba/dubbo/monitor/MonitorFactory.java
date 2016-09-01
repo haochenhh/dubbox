@@ -24,7 +24,7 @@ import com.alibaba.dubbo.common.extension.SPI;
  * 
  * @author william.liangf
  */
-@SPI("dubbo")
+@SPI("ext")
 public interface MonitorFactory {
     
     /**

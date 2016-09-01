@@ -3,6 +3,7 @@ package com.alibaba.dubbo.monitor.test;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 
@@ -24,9 +25,9 @@ import com.alibaba.dubbo.rpc.RpcInvocation;
 
 public class ExtMonitorTest {
 
-//	private volatile URL lastStatistics;
+	// private volatile URL lastStatistics;
 
-//	private volatile Invocation lastInvocation;
+	// private volatile Invocation lastInvocation;
 
 	private Random random = new Random();
 
@@ -51,7 +52,7 @@ public class ExtMonitorTest {
 		}
 
 		public Result invoke(Invocation invocation) throws RpcException {
-//			lastInvocation = invocation;
+			// lastInvocation = invocation;
 			try {
 				Thread.sleep(random.nextInt(1000));
 			} catch (InterruptedException e) {
@@ -74,14 +75,25 @@ public class ExtMonitorTest {
 
 	@Test
 	public void testMonitor() throws InterruptedException {
-		MonitorFilter filter = new MonitorFilter();
+		final MonitorFilter filter = new MonitorFilter();
 		filter.setMonitorFactory(monitorFactory);
-		Invocation invocation = new RpcInvocation("aaa", new Class<?>[0], new Object[0]);
+		final Invocation invocation = new RpcInvocation("aaa", new Class<?>[0], new Object[0]);
 		RpcContext.getContext().setRemoteAddress(NetUtils.getLocalHost(), 20880)
 				.setLocalAddress(NetUtils.getLocalHost(), 2345);
-		while (true) {
-			filter.invoke(serviceInvoker, invocation);
+
+		for (int i = 0; i < 5; i++) {
+			new Thread(new Runnable() {
+
+				@Override
+				public void run() {
+					while (true) {
+						filter.invoke(serviceInvoker, invocation);
+					}
+				}
+			}).start();
 		}
 
+		
+		new CountDownLatch(1).await();
 	}
 }
