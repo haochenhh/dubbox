@@ -17,9 +17,10 @@ import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.rpc.Invoker;
-import com.codahale.metrics.ExponentiallyDecayingReservoir;
+
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.UniformReservoir;
 
 /**
  * 
@@ -106,6 +107,7 @@ public class ExtMonitor implements Monitor {
 					MonitorService.PERCENT999_KEY, String.valueOf(toInt(snapshot.getValue(0.999)))//
 			);
 			monitorService.collect(url);
+//			System.out.println(url);
 
 			// 减去上次统计的信息
 			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
@@ -139,7 +141,7 @@ public class ExtMonitor implements Monitor {
 	}
 
 	private Histogram newHistogram() {
-		return new Histogram(new ExponentiallyDecayingReservoir());
+		return new Histogram(new UniformReservoir());
 	}
 
 	public void collect(URL url) {
@@ -168,7 +170,7 @@ public class ExtMonitor implements Monitor {
 				update = new StatisticsData(success, failure, input, output, elapsed, concurrent, input, output,
 						elapsed, concurrent, newHistogram());
 			} else {
-				//拷贝直方图，并在新的直方图中做更新操作
+				// 拷贝直方图，并在新的直方图中做更新操作
 				Histogram histogram = cloneHistogram(current.getHistogram());
 				histogram.update(elapsed);
 				update = new StatisticsData(current.getSuccess() + success, //
