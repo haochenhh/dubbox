@@ -7,8 +7,9 @@
 		<version>2.8.4</version>
 	</parent>
 	<artifactId>dubbo-monitor-ext</artifactId>
+	<packaging>jar</packaging>
 	<name>${project.artifactId}</name>
-	<description>the ext monitor module of dubbo project</description>
+	<description>The ext monitor module of dubbo project</description>
 	<properties>
 		<skip_maven_deploy>true</skip_maven_deploy>
 	</properties>

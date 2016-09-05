@@ -1,6 +1,5 @@
 package com.alibaba.dubbo.monitor.ext;
 
-import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Histogram;
 
 /**
@@ -13,27 +12,43 @@ import com.codahale.metrics.Histogram;
  */
 public class StatisticsData {
 
-	private long success;
+	private final long success;
 
-	private long failure;
+	private final long failure;
 
-	private long input;
+	private final long input;
 
-	private long output;
+	private final long output;
 
-	private long elapsed;
+	private final long elapsed;
 
-	private long concurrent;
+	private final long concurrent;
 
-	private long maxInput;
+	private final long maxInput;
 
-	private long maxOutput;
+	private final long maxOutput;
 
-	private long maxElapsed;
+	private final long maxElapsed;
 
-	private long maxConcurrent;
+	private final long maxConcurrent;
 
-	private Histogram histogram;
+	private final Histogram histogram;
+
+	public StatisticsData(long success, long failure, long input, long output, long elapsed, long concurrent,
+			long maxInput, long maxOutput, long maxElapsed, long maxConcurrent, Histogram histogram) {
+		super();
+		this.success = success;
+		this.failure = failure;
+		this.input = input;
+		this.output = output;
+		this.elapsed = elapsed;
+		this.concurrent = concurrent;
+		this.maxInput = maxInput;
+		this.maxOutput = maxOutput;
+		this.maxElapsed = maxElapsed;
+		this.maxConcurrent = maxConcurrent;
+		this.histogram = histogram;
+	}
 
 	public long getSuccess() {
 		return success;
@@ -75,65 +90,8 @@ public class StatisticsData {
 		return maxConcurrent;
 	}
 
-	public void setSuccess(long success) {
-		this.success = success;
-	}
-
-	public void setFailure(long failure) {
-		this.failure = failure;
-	}
-
-	public void setInput(long input) {
-		this.input = input;
-	}
-
-	public void setOutput(long output) {
-		this.output = output;
-	}
-
-	public void setElapsed(long elapsed) {
-		this.elapsed = elapsed;
-	}
-
-	public void setConcurrent(long concurrent) {
-		this.concurrent = concurrent;
-	}
-
-	public void setMaxInput(long maxInput) {
-		this.maxInput = maxInput;
-	}
-
-	public void setMaxOutput(long maxOutput) {
-		this.maxOutput = maxOutput;
-	}
-
-	public void setMaxElapsed(long maxElapsed) {
-		this.maxElapsed = maxElapsed;
-	}
-
-	public void setMaxConcurrent(long maxConcurrent) {
-		this.maxConcurrent = maxConcurrent;
-	}
-
 	public Histogram getHistogram() {
 		return histogram;
-	}
-
-	public void setHistogram(Histogram histogram) {
-		this.histogram = histogram;
-	}
-
-	public void updateHistogram(long elapsed) {
-		System.out.println(elapsed);
-		histogram.update(elapsed);
-	}
-
-	public void initHistogram() {
-		histogram = newHistogram();
-	}
-
-	private Histogram newHistogram() {
-		return new Histogram(new ExponentiallyDecayingReservoir());
 	}
 
 }

@@ -283,6 +283,11 @@
         </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>
+            <artifactId>dubbo-monitor-ext</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
             <artifactId>dubbo-container-spring</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
@@ -400,6 +405,7 @@
                                     <include>com.alibaba:dubbo-registry-redis</include>
                                     <include>com.alibaba:dubbo-monitor-api</include>
                                     <include>com.alibaba:dubbo-monitor-default</include>
+                                    <include>com.alibaba:dubbo-monitor-ext</include>
                                     <include>com.alibaba:dubbo-config-api</include>
                                     <include>com.alibaba:dubbo-config-spring</include>
                                     <include>com.alibaba:dubbo-container-api</include>

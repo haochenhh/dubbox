@@ -1,6 +1,5 @@
 package com.alibaba.dubbo.monitor.ext;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +17,8 @@ import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.rpc.Invoker;
+import com.codahale.metrics.ExponentiallyDecayingReservoir;
+import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 
 /**
@@ -97,41 +98,48 @@ public class ExtMonitor implements Monitor {
 					MonitorService.MAX_OUTPUT, String.valueOf(maxOutput), //
 					MonitorService.MAX_ELAPSED, String.valueOf(maxElapsed), //
 					MonitorService.MAX_CONCURRENT, String.valueOf(maxConcurrent), //
-					MonitorService.PERCENT75_KEY, String.valueOf(snapshot.getValue(0.75)), //
-					MonitorService.PERCENT90_KEY, String.valueOf(snapshot.getValue(0.90)), //
-					MonitorService.PERCENT95_KEY, String.valueOf(snapshot.getValue(0.95)), //
-					MonitorService.PERCENT98_KEY, String.valueOf(snapshot.getValue(0.98)), //
-					MonitorService.PERCENT99_KEY, String.valueOf(snapshot.getValue(0.99)), //
-					MonitorService.PERCENT999_KEY, String.valueOf(snapshot.getValue(0.999))//
+					MonitorService.PERCENT75_KEY, String.valueOf(toInt(snapshot.getValue(0.75))), //
+					MonitorService.PERCENT90_KEY, String.valueOf(toInt(snapshot.getValue(0.90))), //
+					MonitorService.PERCENT95_KEY, String.valueOf(toInt(snapshot.getValue(0.95))), //
+					MonitorService.PERCENT98_KEY, String.valueOf(toInt(snapshot.getValue(0.98))), //
+					MonitorService.PERCENT99_KEY, String.valueOf(toInt(snapshot.getValue(0.99))), //
+					MonitorService.PERCENT999_KEY, String.valueOf(toInt(snapshot.getValue(0.999)))//
 			);
-			// monitorService.collect(url);
-			System.out.println(Arrays.toString(snapshot.getValues()));
-			System.out.println(url);
+			monitorService.collect(url);
 
 			// 减去上次统计的信息
 			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
-			StatisticsData current;
-			StatisticsData update = new StatisticsData();
-			do {
-				current = reference.get();
+
+			while (true) {
+				StatisticsData current = reference.get();
+				StatisticsData update = null;
 				if (current == null) {
-					update.setSuccess(0);
-					update.setFailure(0);
-					update.setInput(0);
-					update.setOutput(0);
-					update.setElapsed(0);
-					update.setConcurrent(0);
+					update = new StatisticsData(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, newHistogram());
 				} else {
-					update.setSuccess(current.getSuccess() - success);
-					update.setFailure(current.getFailure() - failure);
-					update.setInput(current.getInput() - input);
-					update.setOutput(current.getOutput() - output);
-					update.setElapsed(current.getElapsed() - elapsed);
-					update.setConcurrent(current.getConcurrent() - concurrent);
+					update = new StatisticsData(//
+							current.getSuccess() - success, //
+							current.getFailure() - failure, //
+							current.getInput() - input, //
+							current.getOutput() - output, //
+							current.getElapsed() - elapsed, //
+							current.getConcurrent() - concurrent, //
+							0, 0, 0, 0, newHistogram());
 				}
-				update.initHistogram();
-			} while (!reference.compareAndSet(current, update));
+
+				if (reference.compareAndSet(current, update)) {
+					return;
+				}
+
+			}
 		}
+	}
+
+	private int toInt(double value) {
+		return (int) value;
+	}
+
+	private Histogram newHistogram() {
+		return new Histogram(new ExponentiallyDecayingReservoir());
 	}
 
 	public void collect(URL url) {
@@ -151,40 +159,44 @@ public class ExtMonitor implements Monitor {
 		}
 
 		// CompareAndSet并发加入统计数据
-		// 当前数据，cas返回false时，current不会被修改
-		StatisticsData current;
-		// 新数据
-		StatisticsData update = new StatisticsData();
-		do {
-			current = reference.get();
+
+		while (true) {
+			StatisticsData current = reference.get();
+			StatisticsData update = null;
+
 			if (current == null) {
-				update.setSuccess(success);
-				update.setFailure(failure);
-				update.setInput(input);
-				update.setOutput(output);
-				update.setElapsed(elapsed);
-				update.setConcurrent(concurrent);
-				update.setMaxInput(input);
-				update.setMaxOutput(output);
-				update.setMaxElapsed(elapsed);
-				update.setMaxConcurrent(concurrent);
-				update.initHistogram();
+				update = new StatisticsData(success, failure, input, output, elapsed, concurrent, input, output,
+						elapsed, concurrent, newHistogram());
 			} else {
-				update.setSuccess(current.getSuccess() + success);
-				update.setFailure(current.getFailure() + failure);
-				update.setInput(current.getInput() + input);
-				update.setOutput(current.getOutput() + output);
-				update.setElapsed(current.getElapsed() + elapsed);
-				update.setConcurrent((current.getConcurrent() + concurrent) / 2);
-				update.setMaxInput(Math.max(current.getMaxInput(), input));
-				update.setMaxOutput(Math.max(current.getMaxOutput(), output));
-				update.setMaxElapsed(Math.max(current.getMaxElapsed(), elapsed));
-				update.setMaxConcurrent(Math.max(current.getMaxConcurrent(), concurrent));
-				// 统计百分比
-				update.setHistogram(current.getHistogram());
-				update.updateHistogram(elapsed);
+				//拷贝直方图，并在新的直方图中做更新操作
+				Histogram histogram = cloneHistogram(current.getHistogram());
+				histogram.update(elapsed);
+				update = new StatisticsData(current.getSuccess() + success, //
+						current.getFailure() + failure, //
+						current.getInput() + input, //
+						current.getOutput() + output, //
+						current.getElapsed() + elapsed, //
+						(current.getConcurrent() + concurrent) / 2, //
+						Math.max(current.getMaxInput(), input), //
+						Math.max(current.getMaxOutput(), output), //
+						Math.max(current.getMaxElapsed(), elapsed), //
+						Math.max(current.getMaxConcurrent(), concurrent), //
+						histogram);
 			}
-		} while (!reference.compareAndSet(current, update));
+
+			if (reference.compareAndSet(current, update)) {
+				return;
+			}
+		}
+	}
+
+	private Histogram cloneHistogram(Histogram currentHistogram) {
+		long[] values = currentHistogram.getSnapshot().getValues();
+		Histogram newHistogram = newHistogram();
+		for (long value : values) {
+			newHistogram.update(value);
+		}
+		return newHistogram;
 	}
 
 	public List<URL> lookup(URL query) {
