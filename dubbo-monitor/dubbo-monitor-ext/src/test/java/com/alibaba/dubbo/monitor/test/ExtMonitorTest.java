@@ -4,6 +4,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 
@@ -29,9 +30,14 @@ public class ExtMonitorTest {
 
 	// private volatile Invocation lastInvocation;
 
-	private Random random = new Random();
+	class CountInvoker implements Invoker<MonitorService> {
 
-	private final Invoker<MonitorService> serviceInvoker = new Invoker<MonitorService>() {
+		private AtomicInteger num = new AtomicInteger(0);
+
+		public int count() {
+			return num.get();
+		}
+
 		public Class<MonitorService> getInterface() {
 			return MonitorService.class;
 		}
@@ -54,7 +60,7 @@ public class ExtMonitorTest {
 		public Result invoke(Invocation invocation) throws RpcException {
 			// lastInvocation = invocation;
 			try {
-				Thread.sleep(random.nextInt(100));
+				Thread.sleep(num.getAndIncrement());
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -63,7 +69,11 @@ public class ExtMonitorTest {
 
 		public void destroy() {
 		}
-	};
+	}
+
+	private Random random = new Random();
+
+	private final CountInvoker serviceInvoker = new CountInvoker();
 
 	private MonitorFactory monitorFactory = new AbstractMonitorFactory() {
 
@@ -74,26 +84,133 @@ public class ExtMonitorTest {
 	};
 
 	@Test
-	public void testMonitor() throws InterruptedException {
-		final MonitorFilter filter = new MonitorFilter();
+	public void testMonitor() {
+		MonitorFilter filter = new MonitorFilter();
 		filter.setMonitorFactory(monitorFactory);
-		final Invocation invocation = new RpcInvocation("aaa", new Class<?>[0], new Object[0]);
+		Invocation invocation = new RpcInvocation("aaa", new Class<?>[0], new Object[0]);
 		RpcContext.getContext().setRemoteAddress(NetUtils.getLocalHost(), 20880)
 				.setLocalAddress(NetUtils.getLocalHost(), 2345);
 
-		for (int i = 0; i < 5; i++) {
+		// multiThreadOp(invocation, filter);
+		op(invocation, filter);
+	}
+
+	private void op(final Invocation invocation, final MonitorFilter filter) {
+		long start = System.currentTimeMillis();
+		for (int i = 0; i < 500; i++) {
+			filter.invoke(serviceInvoker, invocation);
+		}
+		long cost = System.currentTimeMillis() - start;
+		System.out.println(serviceInvoker.count());
+		System.out.println(cost + "ms");
+	}
+
+	private void multiThreadOp(final Invocation invocation, final MonitorFilter filter) {
+		int threadNum = 5;
+		final CountDownLatch startGate = new CountDownLatch(1);
+		final CountDownLatch endGate = new CountDownLatch(threadNum);
+		for (int i = 0; i < threadNum; i++) {
 			new Thread(new Runnable() {
 
 				@Override
 				public void run() {
-					while (true) {
-						filter.invoke(serviceInvoker, invocation);
+					try {
+						startGate.await();
+						try {
+							for (int i = 0; i < 100; i++) {
+								filter.invoke(serviceInvoker, invocation);
+							}
+						} finally {
+							endGate.countDown();
+						}
+
+					} catch (InterruptedException e) {
+						e.printStackTrace();
 					}
+
 				}
 			}).start();
 		}
+		long start = System.currentTimeMillis();
+		startGate.countDown();
+		try {
+			endGate.await();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		long cost = System.currentTimeMillis() - start;
+		System.out.println(serviceInvoker.count());
+		System.out.println(cost + "ms");
+	}
 
-		
-		new CountDownLatch(1).await();
+	@Test
+	public void testExtMonitor() {
+		final ExtMonitorWithLock monitor = new ExtMonitorWithLock(serviceInvoker, null);
+//		 final ExtMonitor monitor = new ExtMonitor(serviceInvoker, null);
+
+//		multiOp(monitor);
+		 singleOp(monitor);
+	}
+
+	private void singleOp(final Monitor monitor) {
+		long start = System.currentTimeMillis();
+		for (int i = 1; i <=1000; i++) {
+			URL url = new URL("", NetUtils.getLocalHost(), 8080, "/", MonitorService.SUCCESS, "1",
+					MonitorService.ELAPSED, String.valueOf(i), MonitorService.CONCURRENT, String.valueOf(1),
+					Constants.INPUT_KEY, "1", Constants.OUTPUT_KEY, "1");
+			monitor.collect(url);
+		}
+		long cost = System.currentTimeMillis() - start;
+		System.out.println(cost + "ms");
+		if (monitor instanceof Printable) {
+			((Printable) monitor).print();
+		}
+
+	}
+
+	private void multiOp(final Monitor monitor) {
+		final int threadNum = 10;
+		final CountDownLatch startGate = new CountDownLatch(1);
+		final CountDownLatch endGate = new CountDownLatch(threadNum);
+		final AtomicInteger num = new AtomicInteger(0);
+		for (int i = 0; i < threadNum; i++) {
+			new Thread(new Runnable() {
+
+				@Override
+				public void run() {
+					try {
+						startGate.await();
+						try {
+							for (int i = 0; i < 1000; i++) {
+								URL url = new URL("", NetUtils.getLocalHost(), 8080, "/", MonitorService.SUCCESS, "1",
+										MonitorService.ELAPSED, String.valueOf(num.getAndIncrement()),
+										MonitorService.CONCURRENT, String.valueOf(1), Constants.INPUT_KEY, "1",
+										Constants.OUTPUT_KEY, "1");
+								monitor.collect(url);
+							}
+						} finally {
+							endGate.countDown();
+						}
+
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+
+				}
+			}).start();
+		}
+		long start = System.currentTimeMillis();
+		startGate.countDown();
+		try {
+			endGate.await();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		long cost = System.currentTimeMillis() - start;
+		System.out.println(cost + "ms");
+		if (monitor instanceof Printable) {
+			((Printable) monitor).print();
+		}
+
 	}
 }

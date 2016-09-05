@@ -1,9 +1,8 @@
-package com.alibaba.dubbo.monitor.ext;
+package com.alibaba.dubbo.monitor.test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -16,21 +15,17 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
-import com.alibaba.dubbo.monitor.test.Printable;
+import com.alibaba.dubbo.monitor.ext.ExtMonitor;
+import com.alibaba.dubbo.monitor.ext.Statistics;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformReservoir;
 
-/**
- * 
- * @author minjun@youku.com
- *
- */
-public class ExtMonitor implements Monitor, Printable {
+public class ExtMonitorWithLock implements Monitor, Printable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ExtMonitor.class);
-
+	
 	// 定时任务执行器
 	private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3,
 			new NamedThreadFactory("DubboMonitorSendTimer", true));
@@ -44,9 +39,9 @@ public class ExtMonitor implements Monitor, Printable {
 
 	private final long monitorInterval;
 
-	private final ConcurrentMap<Statistics, AtomicReference<StatisticsData>> statisticsMap = new ConcurrentHashMap<Statistics, AtomicReference<StatisticsData>>();
+	private final Map<Statistics, AtomicReference<StatisticsDataLock>> statisticsMap = new HashMap<Statistics, AtomicReference<StatisticsDataLock>>();
 
-	public ExtMonitor(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
+	public ExtMonitorWithLock(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
 		this.monitorInvoker = monitorInvoker;
 		this.monitorService = monitorService;
 		this.monitorInterval = monitorInvoker.getUrl().getPositiveParameter("interval", 60000);
@@ -55,7 +50,7 @@ public class ExtMonitor implements Monitor, Printable {
 			public void run() {
 				// 收集统计信息
 				try {
-					// send();
+//					send();
 				} catch (Throwable t) { // 防御性容错
 					logger.error("Unexpected error occur at send statistic, cause: " + t.getMessage(), t);
 				}
@@ -63,16 +58,16 @@ public class ExtMonitor implements Monitor, Printable {
 		}, monitorInterval, monitorInterval, TimeUnit.MILLISECONDS);
 	}
 
-	public void send() {
+	public synchronized void send() {
 		if (logger.isInfoEnabled()) {
 			logger.info("Send statistics to monitor " + getUrl());
 		}
 		String timestamp = String.valueOf(System.currentTimeMillis());
-		for (Map.Entry<Statistics, AtomicReference<StatisticsData>> entry : statisticsMap.entrySet()) {
+		for (Map.Entry<Statistics, AtomicReference<StatisticsDataLock>> entry : statisticsMap.entrySet()) {
 			// 获取已统计数据
 			Statistics statistics = entry.getKey();
-			AtomicReference<StatisticsData> reference = entry.getValue();
-			StatisticsData data = reference.get();
+			AtomicReference<StatisticsDataLock> reference = entry.getValue();
+			StatisticsDataLock data = reference.get();
 			long success = data.getSuccess();
 			long failure = data.getFailure();
 			long input = data.getInput();
@@ -112,28 +107,9 @@ public class ExtMonitor implements Monitor, Printable {
 			// 减去上次统计的信息
 			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
 
-			while (true) {
-				StatisticsData current = reference.get();
-				StatisticsData update = null;
-				if (current == null) {
-					update = new StatisticsData(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, newHistogram());
-				} else {
-					update = new StatisticsData(//
-							current.getSuccess() - success, //
-							current.getFailure() - failure, //
-							current.getInput() - input, //
-							current.getOutput() - output, //
-							current.getElapsed() - elapsed, //
-							current.getConcurrent() - concurrent, //
-							0, 0, 0, 0, newHistogram());
-				}
-
-				if (reference.compareAndSet(current, update)) {
-					return;
-				}
-
-			}
 		}
+
+		statisticsMap.clear();
 	}
 
 	private int toInt(double value) {
@@ -150,10 +126,10 @@ public class ExtMonitor implements Monitor, Printable {
 	 * 所以在高并发的情况下会有内存溢出的风险
 	 */
 	private Histogram newHistogram() {
-		return new Histogram(new UniformReservoir(5));
+		return new Histogram(new UniformReservoir());
 	}
 
-	public void collect(URL url) {
+	public synchronized void collect(URL url) {
 		// 读写统计变量
 		int success = url.getParameter(MonitorService.SUCCESS, 0);
 		int failure = url.getParameter(MonitorService.FAILURE, 0);
@@ -163,53 +139,36 @@ public class ExtMonitor implements Monitor, Printable {
 		int concurrent = url.getParameter(MonitorService.CONCURRENT, 0);
 		// 初始化原子引用
 		Statistics statistics = new Statistics(url);
-		AtomicReference<StatisticsData> reference = statisticsMap.get(statistics);
+		AtomicReference<StatisticsDataLock> reference = statisticsMap.get(statistics);
 		if (reference == null) {
-			statisticsMap.putIfAbsent(statistics, new AtomicReference<StatisticsData>());
+			statisticsMap.put(statistics, new AtomicReference<StatisticsDataLock>());
 			reference = statisticsMap.get(statistics);
 		}
 
-		// CompareAndSet并发加入统计数据
+		StatisticsDataLock current = reference.get();
 
-		while (true) {
-			StatisticsData current = reference.get();
-			StatisticsData update = null;
-
-			if (current == null) {
-				Histogram histogram = newHistogram();
-				histogram.update(elapsed);
-				update = new StatisticsData(success, failure, input, output, elapsed, concurrent, input, output,
-						elapsed, concurrent, histogram);
-			} else {
-				// 拷贝直方图，并在新的直方图中做更新操作
-				Histogram histogram = cloneHistogram(current.getHistogram());
-				histogram.update(elapsed);
-				update = new StatisticsData(current.getSuccess() + success, //
-						current.getFailure() + failure, //
-						current.getInput() + input, //
-						current.getOutput() + output, //
-						current.getElapsed() + elapsed, //
-						(current.getConcurrent() + concurrent) / 2, //
-						Math.max(current.getMaxInput(), input), //
-						Math.max(current.getMaxOutput(), output), //
-						Math.max(current.getMaxElapsed(), elapsed), //
-						Math.max(current.getMaxConcurrent(), concurrent), //
-						histogram);
-			}
-
-			if (reference.compareAndSet(current, update)) {
-				break;
-			}
+		if (current == null) {
+			Histogram histogram=newHistogram();
+			histogram.update(elapsed);
+			current = new StatisticsDataLock(success, failure, input, output, elapsed, concurrent, input, output,
+					elapsed, concurrent, histogram);
+		} else {
+			// 拷贝直方图，并在新的直方图中做更新操作
+			Histogram histogram = current.getHistogram();
+			histogram.update(elapsed);
+			current.setSuccess(current.getSuccess() + success);
+			current.setFailure(current.getFailure() + failure);
+			current.setInput(current.getInput() + input);
+			current.setOutput(current.getOutput() + output);
+			current.setElapsed(current.getElapsed() + elapsed);
+			current.setConcurrent((current.getConcurrent() + concurrent) / 2);
+			current.setMaxInput(Math.max(current.getMaxInput(), input));
+			current.setMaxOutput(Math.max(current.getMaxOutput(), output));
+			current.setMaxElapsed(Math.max(current.getMaxElapsed(), elapsed));
+			current.setMaxConcurrent(Math.max(current.getMaxConcurrent(), concurrent));
+			current.setHistogram(histogram);
 		}
-	}
-
-	private Histogram cloneHistogram(Histogram currentHistogram) {
-		long[] values = currentHistogram.getSnapshot().getValues();
-		Histogram newHistogram = newHistogram();
-		for (long value : values) {
-			newHistogram.update(value);
-		}
-		return newHistogram;
+		reference.set(current);
 	}
 
 	public List<URL> lookup(URL query) {
@@ -234,7 +193,7 @@ public class ExtMonitor implements Monitor, Printable {
 	}
 
 	@Override
-	public void print() {
+	public synchronized void print() {
 		System.out.println(statisticsMap);
 	}
 
