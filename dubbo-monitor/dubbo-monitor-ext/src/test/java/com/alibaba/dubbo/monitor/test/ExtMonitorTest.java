@@ -143,18 +143,21 @@ public class ExtMonitorTest {
 		System.out.println(cost + "ms");
 	}
 
+	// 49132ms
+	// 45097ms
 	@Test
 	public void testExtMonitor() {
-		final ExtMonitorWithLock monitor = new ExtMonitorWithLock(serviceInvoker, null);
-//		 final ExtMonitor monitor = new ExtMonitor(serviceInvoker, null);
+		MonitorService monitorService = new MockMonitorService();
+//		final ExtMonitorWithLock monitor = new ExtMonitorWithLock(serviceInvoker, monitorService);
+		 final ExtMonitor monitor = new ExtMonitor(serviceInvoker, monitorService);
 
-//		multiOp(monitor);
-		 singleOp(monitor);
+		multiOp(monitor);
+		// singleOp(monitor);
 	}
 
 	private void singleOp(final Monitor monitor) {
 		long start = System.currentTimeMillis();
-		for (int i = 1; i <=1000; i++) {
+		for (int i = 1; i <= 10000; i++) {
 			URL url = new URL("", NetUtils.getLocalHost(), 8080, "/", MonitorService.SUCCESS, "1",
 					MonitorService.ELAPSED, String.valueOf(i), MonitorService.CONCURRENT, String.valueOf(1),
 					Constants.INPUT_KEY, "1", Constants.OUTPUT_KEY, "1");
@@ -169,7 +172,7 @@ public class ExtMonitorTest {
 	}
 
 	private void multiOp(final Monitor monitor) {
-		final int threadNum = 10;
+		final int threadNum = 3;
 		final CountDownLatch startGate = new CountDownLatch(1);
 		final CountDownLatch endGate = new CountDownLatch(threadNum);
 		final AtomicInteger num = new AtomicInteger(0);
@@ -181,11 +184,11 @@ public class ExtMonitorTest {
 					try {
 						startGate.await();
 						try {
-							for (int i = 0; i < 1000; i++) {
+							for (int i = 0; i < 10000; i++) {
+								int elapsed = getElapsed();
 								URL url = new URL("", NetUtils.getLocalHost(), 8080, "/", MonitorService.SUCCESS, "1",
-										MonitorService.ELAPSED, String.valueOf(num.getAndIncrement()),
-										MonitorService.CONCURRENT, String.valueOf(1), Constants.INPUT_KEY, "1",
-										Constants.OUTPUT_KEY, "1");
+										MonitorService.ELAPSED, String.valueOf(elapsed), MonitorService.CONCURRENT,
+										String.valueOf(1), Constants.INPUT_KEY, "1", Constants.OUTPUT_KEY, "1");
 								monitor.collect(url);
 							}
 						} finally {
@@ -212,5 +215,15 @@ public class ExtMonitorTest {
 			((Printable) monitor).print();
 		}
 
+	}
+
+	protected int getElapsed() {
+		int r = random.nextInt(10);
+		try {
+			Thread.sleep(r);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		return r;
 	}
 }

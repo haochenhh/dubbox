@@ -1,4 +1,4 @@
-package com.alibaba.dubbo.monitor.test;
+package com.alibaba.dubbo.monitor.ext;
 
 import java.util.HashMap;
 import java.util.List;
@@ -15,16 +15,16 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
-import com.alibaba.dubbo.monitor.ext.ExtMonitor;
-import com.alibaba.dubbo.monitor.ext.Statistics;
+import com.alibaba.dubbo.monitor.test.Printable;
+import com.alibaba.dubbo.monitor.test.StatisticsDataLock;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformReservoir;
 
-public class ExtMonitorWithLock implements Monitor, Printable {
+public class ExtMonitorSync implements Monitor, Printable {
 
-	private static final Logger logger = LoggerFactory.getLogger(ExtMonitor.class);
+	private static final Logger logger = LoggerFactory.getLogger(ExtMonitorSync.class);
 
 	// 定时任务执行器
 	private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3,
@@ -41,7 +41,7 @@ public class ExtMonitorWithLock implements Monitor, Printable {
 
 	private final Map<Statistics, AtomicReference<StatisticsDataLock>> statisticsMap = new HashMap<Statistics, AtomicReference<StatisticsDataLock>>();
 
-	public ExtMonitorWithLock(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
+	public ExtMonitorSync(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
 		this.monitorInvoker = monitorInvoker;
 		this.monitorService = monitorService;
 		this.monitorInterval = monitorInvoker.getUrl().getPositiveParameter("interval", 60000);

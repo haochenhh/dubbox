@@ -101,12 +101,12 @@ public class StatisticsData {
 	public String toString() {
 		Snapshot s = histogram.getSnapshot();
 		System.out.println(Arrays.toString(s.getValues()));
-		System.out.println("size is"+s.getValues().length);
+		System.out.println("size is "+s.getValues().length);
 		return "StatisticsData [success=" + success + ", failure=" + failure + ", input=" + input + ", output=" + output
 				+ ", elapsed=" + elapsed + ", concurrent=" + concurrent + ", maxInput=" + maxInput + ", maxOutput="
 				+ maxOutput + ", maxElapsed=" + maxElapsed + ", maxConcurrent=" + maxConcurrent + ", histogram="
-				+ "75%=" + s.get75thPercentile() + "&95%=" + s.get95thPercentile() + "&98%=" + s.get98thPercentile()
-				+ "&99%=" + s.get99thPercentile() + "&999%=" + s.get999thPercentile() + "]";
+				+ "\n75%=" + s.get75thPercentile() + "\n95%=" + s.get95thPercentile() + "\n98%=" + s.get98thPercentile()
+				+ "\n99%=" + s.get99thPercentile() + "\n999%=" + s.get999thPercentile() + "]";
 	}
 
 }

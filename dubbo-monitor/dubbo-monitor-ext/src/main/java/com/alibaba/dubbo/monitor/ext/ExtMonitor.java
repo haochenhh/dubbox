@@ -16,11 +16,12 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
+import com.alibaba.dubbo.monitor.ext.metrics.CloneableHistogram;
+import com.alibaba.dubbo.monitor.ext.metrics.CloneableReservior;
 import com.alibaba.dubbo.monitor.test.Printable;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.UniformReservoir;
 
 /**
  * 
@@ -30,6 +31,8 @@ import com.codahale.metrics.UniformReservoir;
 public class ExtMonitor implements Monitor, Printable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ExtMonitor.class);
+
+	public static final int DEFAULT_SIZE = 1028;
 
 	// 定时任务执行器
 	private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3,
@@ -55,7 +58,7 @@ public class ExtMonitor implements Monitor, Printable {
 			public void run() {
 				// 收集统计信息
 				try {
-					// send();
+					 send();
 				} catch (Throwable t) { // 防御性容错
 					logger.error("Unexpected error occur at send statistic, cause: " + t.getMessage(), t);
 				}
@@ -106,8 +109,7 @@ public class ExtMonitor implements Monitor, Printable {
 					MonitorService.PERCENT99_KEY, String.valueOf(toInt(snapshot.getValue(0.99))), //
 					MonitorService.PERCENT999_KEY, String.valueOf(toInt(snapshot.getValue(0.999)))//
 			);
-			// monitorService.collect(url);
-			System.out.println(url);
+			 monitorService.collect(url);
 
 			// 减去上次统计的信息
 			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
@@ -150,7 +152,7 @@ public class ExtMonitor implements Monitor, Printable {
 	 * 所以在高并发的情况下会有内存溢出的风险
 	 */
 	private Histogram newHistogram() {
-		return new Histogram(new UniformReservoir(5));
+		return new CloneableHistogram(new CloneableReservior(DEFAULT_SIZE));
 	}
 
 	public void collect(URL url) {
@@ -198,18 +200,17 @@ public class ExtMonitor implements Monitor, Printable {
 			}
 
 			if (reference.compareAndSet(current, update)) {
-				break;
+				return;
 			}
 		}
 	}
 
 	private Histogram cloneHistogram(Histogram currentHistogram) {
-		long[] values = currentHistogram.getSnapshot().getValues();
-		Histogram newHistogram = newHistogram();
-		for (long value : values) {
-			newHistogram.update(value);
+		if (currentHistogram instanceof CloneableHistogram) {
+			return ((CloneableHistogram) currentHistogram).doClone();
+		} else {
+			throw new IllegalArgumentException(currentHistogram + "不是Cloneable类型");
 		}
-		return newHistogram;
 	}
 
 	public List<URL> lookup(URL query) {
