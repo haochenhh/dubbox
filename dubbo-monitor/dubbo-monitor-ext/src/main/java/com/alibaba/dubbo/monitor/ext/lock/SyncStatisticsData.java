@@ -1,11 +1,11 @@
-package com.alibaba.dubbo.monitor.test;
+package com.alibaba.dubbo.monitor.ext.lock;
 
 import java.util.Arrays;
 
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 
-public class StatisticsDataLock {
+public class SyncStatisticsData {
 
 	private long success;
 
@@ -29,7 +29,7 @@ public class StatisticsDataLock {
 
 	private Histogram histogram;
 
-	public StatisticsDataLock(long success, long failure, long input, long output, long elapsed, long concurrent,
+	public SyncStatisticsData(long success, long failure, long input, long output, long elapsed, long concurrent,
 			long maxInput, long maxOutput, long maxElapsed, long maxConcurrent, Histogram histogram) {
 		super();
 		this.success = success;
@@ -45,7 +45,7 @@ public class StatisticsDataLock {
 		this.histogram = histogram;
 	}
 
-	public StatisticsDataLock() {
+	public SyncStatisticsData() {
 		super();
 	}
 
@@ -141,7 +141,7 @@ public class StatisticsDataLock {
 	public String toString() {
 		Snapshot s = histogram.getSnapshot();
 		System.out.println(Arrays.toString(s.getValues()));
-		System.out.println("size is "+s.getValues().length);
+		System.out.println("size is " + s.getValues().length);
 		return "StatisticsData [success=" + success + ", failure=" + failure + ", input=" + input + ", output=" + output
 				+ ", elapsed=" + elapsed + ", concurrent=" + concurrent + ", maxInput=" + maxInput + ", maxOutput="
 				+ maxOutput + ", maxElapsed=" + maxElapsed + ", maxConcurrent=" + maxConcurrent + ", histogram="

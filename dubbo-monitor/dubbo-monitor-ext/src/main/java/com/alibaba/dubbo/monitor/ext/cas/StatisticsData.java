@@ -1,4 +1,4 @@
-package com.alibaba.dubbo.monitor.ext;
+package com.alibaba.dubbo.monitor.ext.cas;
 
 import java.util.Arrays;
 

@@ -19,6 +19,7 @@ import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
+import com.alibaba.dubbo.monitor.ext.cas.CasExtMonitor;
 import com.alibaba.dubbo.monitor.support.AbstractMonitorFactory;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
@@ -59,7 +60,7 @@ public class ExtMonitorFactroy extends AbstractMonitorFactory {
 				Constants.REFERENCE_FILTER_KEY, filter + "-monitor");
 		Invoker<MonitorService> monitorInvoker = protocol.refer(MonitorService.class, url);
 		MonitorService monitorService = proxyFactory.getProxy(monitorInvoker);
-		return new ExtMonitor(monitorInvoker, monitorService);
+		return new CasExtMonitor(monitorInvoker, monitorService);
 	}
 
 }

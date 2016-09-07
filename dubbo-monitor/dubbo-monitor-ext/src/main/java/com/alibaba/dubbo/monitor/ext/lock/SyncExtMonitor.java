@@ -1,4 +1,4 @@
-package com.alibaba.dubbo.monitor.test;
+package com.alibaba.dubbo.monitor.ext.lock;
 
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +15,6 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
-import com.alibaba.dubbo.monitor.ext.ExtMonitor;
 import com.alibaba.dubbo.monitor.ext.Printable;
 import com.alibaba.dubbo.monitor.ext.Statistics;
 import com.alibaba.dubbo.rpc.Invoker;
@@ -23,13 +22,21 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformReservoir;
 
-public class ExtMonitorWithLock implements Monitor, Printable {
+/**
+ * 采用加锁同步方式处理的ExtMonitor
+ * 
+ * @author loda
+ *
+ */
+public class SyncExtMonitor implements Monitor, Printable {
 
-	private static final Logger logger = LoggerFactory.getLogger(ExtMonitor.class);
+	private static final Logger logger = LoggerFactory.getLogger(SyncExtMonitor.class);
 
 	// 定时任务执行器
 	private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3,
-			new NamedThreadFactory("DubboMonitorSendTimer", true));
+			new NamedThreadFactory("SyncExtMonitorSendTimer", true));
+
+	private static final int DEFAULT_SIZE = 1028;
 
 	// 统计信息收集定时器
 	private final ScheduledFuture<?> sendFuture;
@@ -40,9 +47,9 @@ public class ExtMonitorWithLock implements Monitor, Printable {
 
 	private final long monitorInterval;
 
-	private final Map<Statistics, AtomicReference<StatisticsDataLock>> statisticsMap = new HashMap<Statistics, AtomicReference<StatisticsDataLock>>();
+	private final Map<Statistics, AtomicReference<SyncStatisticsData>> statisticsMap = new HashMap<Statistics, AtomicReference<SyncStatisticsData>>();
 
-	public ExtMonitorWithLock(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
+	public SyncExtMonitor(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
 		this.monitorInvoker = monitorInvoker;
 		this.monitorService = monitorService;
 		this.monitorInterval = monitorInvoker.getUrl().getPositiveParameter("interval", 60000);
@@ -64,11 +71,11 @@ public class ExtMonitorWithLock implements Monitor, Printable {
 			logger.info("Send statistics to monitor " + getUrl());
 		}
 		String timestamp = String.valueOf(System.currentTimeMillis());
-		for (Map.Entry<Statistics, AtomicReference<StatisticsDataLock>> entry : statisticsMap.entrySet()) {
+		for (Map.Entry<Statistics, AtomicReference<SyncStatisticsData>> entry : statisticsMap.entrySet()) {
 			// 获取已统计数据
 			Statistics statistics = entry.getKey();
-			AtomicReference<StatisticsDataLock> reference = entry.getValue();
-			StatisticsDataLock data = reference.get();
+			AtomicReference<SyncStatisticsData> reference = entry.getValue();
+			SyncStatisticsData data = reference.get();
 			long success = data.getSuccess();
 			long failure = data.getFailure();
 			long input = data.getInput();
@@ -126,7 +133,7 @@ public class ExtMonitorWithLock implements Monitor, Printable {
 	 * 所以在高并发的情况下会有内存溢出的风险
 	 */
 	private Histogram newHistogram() {
-		return new Histogram(new UniformReservoir(ExtMonitor.DEFAULT_SIZE));
+		return new Histogram(new UniformReservoir(DEFAULT_SIZE));
 	}
 
 	public synchronized void collect(URL url) {
@@ -139,18 +146,18 @@ public class ExtMonitorWithLock implements Monitor, Printable {
 		int concurrent = url.getParameter(MonitorService.CONCURRENT, 0);
 		// 初始化原子引用
 		Statistics statistics = new Statistics(url);
-		AtomicReference<StatisticsDataLock> reference = statisticsMap.get(statistics);
+		AtomicReference<SyncStatisticsData> reference = statisticsMap.get(statistics);
 		if (reference == null) {
-			statisticsMap.put(statistics, new AtomicReference<StatisticsDataLock>());
+			statisticsMap.put(statistics, new AtomicReference<SyncStatisticsData>());
 			reference = statisticsMap.get(statistics);
 		}
 
-		StatisticsDataLock current = reference.get();
+		SyncStatisticsData current = reference.get();
 
 		if (current == null) {
 			Histogram histogram = newHistogram();
 			histogram.update(elapsed);
-			current = new StatisticsDataLock(success, failure, input, output, elapsed, concurrent, input, output,
+			current = new SyncStatisticsData(success, failure, input, output, elapsed, concurrent, input, output,
 					elapsed, concurrent, histogram);
 		} else {
 			// 拷贝直方图，并在新的直方图中做更新操作

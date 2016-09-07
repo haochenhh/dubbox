@@ -14,7 +14,8 @@ import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorFactory;
 import com.alibaba.dubbo.monitor.MonitorService;
-import com.alibaba.dubbo.monitor.ext.ExtMonitor;
+import com.alibaba.dubbo.monitor.ext.cas.CasExtMonitor;
+import com.alibaba.dubbo.monitor.ext.lock.SyncExtMonitor;
 import com.alibaba.dubbo.monitor.ext.Printable;
 import com.alibaba.dubbo.monitor.support.AbstractMonitorFactory;
 import com.alibaba.dubbo.monitor.support.MonitorFilter;
@@ -80,7 +81,7 @@ public class ExtMonitorTest {
 
 		@Override
 		protected Monitor createMonitor(URL url) {
-			return new ExtMonitor(serviceInvoker, null);
+			return new CasExtMonitor(serviceInvoker, null);
 		}
 	};
 
@@ -149,11 +150,11 @@ public class ExtMonitorTest {
 	@Test
 	public void testExtMonitor() {
 		MonitorService monitorService = new MockMonitorService();
-//		final ExtMonitorWithLock monitor = new ExtMonitorWithLock(serviceInvoker, monitorService);
-		 final ExtMonitor monitor = new ExtMonitor(serviceInvoker, monitorService);
+//		final SyncExtMonitor monitor = new SyncExtMonitor(serviceInvoker, monitorService);
+		 final CasExtMonitor monitor = new CasExtMonitor(serviceInvoker, monitorService);
 
 		multiOp(monitor);
-		// singleOp(monitor);
+//		 singleOp(monitor);
 	}
 
 	private void singleOp(final Monitor monitor) {
