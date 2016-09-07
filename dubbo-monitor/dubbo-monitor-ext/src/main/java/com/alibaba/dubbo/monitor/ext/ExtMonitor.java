@@ -18,7 +18,6 @@ import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.monitor.ext.metrics.CloneableHistogram;
 import com.alibaba.dubbo.monitor.ext.metrics.CloneableReservior;
-import com.alibaba.dubbo.monitor.test.Printable;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;

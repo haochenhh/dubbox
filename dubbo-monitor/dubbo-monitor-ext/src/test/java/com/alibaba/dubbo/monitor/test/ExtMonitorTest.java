@@ -15,6 +15,7 @@ import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorFactory;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.monitor.ext.ExtMonitor;
+import com.alibaba.dubbo.monitor.ext.Printable;
 import com.alibaba.dubbo.monitor.support.AbstractMonitorFactory;
 import com.alibaba.dubbo.monitor.support.MonitorFilter;
 import com.alibaba.dubbo.rpc.Invocation;

@@ -1,4 +1,4 @@
-package com.alibaba.dubbo.monitor.test;
+package com.alibaba.dubbo.monitor.ext;
 
 public interface Printable {
 

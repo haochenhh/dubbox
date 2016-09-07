@@ -16,6 +16,7 @@ import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorService;
 import com.alibaba.dubbo.monitor.ext.ExtMonitor;
+import com.alibaba.dubbo.monitor.ext.Printable;
 import com.alibaba.dubbo.monitor.ext.Statistics;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.codahale.metrics.Histogram;
