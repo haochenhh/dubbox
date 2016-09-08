@@ -7,7 +7,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
@@ -47,7 +46,7 @@ public class SyncExtMonitor implements Monitor, Printable {
 
 	private final long monitorInterval;
 
-	private final Map<Statistics, AtomicReference<SyncStatisticsData>> statisticsMap = new HashMap<Statistics, AtomicReference<SyncStatisticsData>>();
+	private final Map<Statistics, SyncStatisticsData> statisticsMap = new HashMap<Statistics, SyncStatisticsData>();
 
 	public SyncExtMonitor(Invoker<MonitorService> monitorInvoker, MonitorService monitorService) {
 		this.monitorInvoker = monitorInvoker;
@@ -71,11 +70,10 @@ public class SyncExtMonitor implements Monitor, Printable {
 			logger.info("Send statistics to monitor " + getUrl());
 		}
 		String timestamp = String.valueOf(System.currentTimeMillis());
-		for (Map.Entry<Statistics, AtomicReference<SyncStatisticsData>> entry : statisticsMap.entrySet()) {
+		for (Map.Entry<Statistics, SyncStatisticsData> entry : statisticsMap.entrySet()) {
 			// 获取已统计数据
 			Statistics statistics = entry.getKey();
-			AtomicReference<SyncStatisticsData> reference = entry.getValue();
-			SyncStatisticsData data = reference.get();
+			SyncStatisticsData data = entry.getValue();
 			long success = data.getSuccess();
 			long failure = data.getFailure();
 			long input = data.getInput();
@@ -111,12 +109,9 @@ public class SyncExtMonitor implements Monitor, Printable {
 			);
 			monitorService.collect(url);
 
-			// 减去上次统计的信息
-			// 由于cas操作会导致丢失部分histogram中的样本数据（collect之后compareAndSet成功之前收集的数据），但是histogram直方分布本来就是抽样统计的，所以丢失这部分数据也没有太大影响
-
+			statisticsMap.put(statistics, null);
 		}
 
-		statisticsMap.clear();
 	}
 
 	private int toInt(double value) {
@@ -146,13 +141,7 @@ public class SyncExtMonitor implements Monitor, Printable {
 		int concurrent = url.getParameter(MonitorService.CONCURRENT, 0);
 		// 初始化原子引用
 		Statistics statistics = new Statistics(url);
-		AtomicReference<SyncStatisticsData> reference = statisticsMap.get(statistics);
-		if (reference == null) {
-			statisticsMap.put(statistics, new AtomicReference<SyncStatisticsData>());
-			reference = statisticsMap.get(statistics);
-		}
-
-		SyncStatisticsData current = reference.get();
+		SyncStatisticsData current = statisticsMap.get(statistics);
 
 		if (current == null) {
 			Histogram histogram = newHistogram();
@@ -175,7 +164,8 @@ public class SyncExtMonitor implements Monitor, Printable {
 			current.setMaxConcurrent(Math.max(current.getMaxConcurrent(), concurrent));
 			current.setHistogram(histogram);
 		}
-		reference.set(current);
+
+		statisticsMap.put(statistics, current);
 	}
 
 	public List<URL> lookup(URL query) {

@@ -26,6 +26,7 @@ import com.codahale.metrics.Snapshot;
 
 /**
  * 采用cas方式实现的非阻塞ExtMonitor
+ * 
  * @author minjun@youku.com
  *
  */
@@ -132,7 +133,7 @@ public class CasExtMonitor implements Monitor, Printable {
 				}
 
 				if (reference.compareAndSet(current, update)) {
-					return;
+					break;
 				}
 
 			}
@@ -201,7 +202,7 @@ public class CasExtMonitor implements Monitor, Printable {
 			}
 
 			if (reference.compareAndSet(current, update)) {
-				return;
+				break;
 			}
 		}
 	}
