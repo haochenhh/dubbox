@@ -62,6 +62,8 @@ public interface MonitorService {
 	String MAX_ELAPSED = "max.elapsed";
 
 	String MAX_CONCURRENT = "max.concurrent";
+	
+	String PERCENT50_KEY = "percent50"; 
 
 	String PERCENT75_KEY = "percent75";
 

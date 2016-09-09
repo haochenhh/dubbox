@@ -104,6 +104,7 @@ public class CasExtMonitor implements Monitor, Printable {
 					MonitorService.MAX_OUTPUT, String.valueOf(maxOutput), //
 					MonitorService.MAX_ELAPSED, String.valueOf(maxElapsed), //
 					MonitorService.MAX_CONCURRENT, String.valueOf(maxConcurrent), //
+					MonitorService.PERCENT50_KEY, String.valueOf(toInt(snapshot.getValue(0.50))), //
 					MonitorService.PERCENT75_KEY, String.valueOf(toInt(snapshot.getValue(0.75))), //
 					MonitorService.PERCENT90_KEY, String.valueOf(toInt(snapshot.getValue(0.90))), //
 					MonitorService.PERCENT95_KEY, String.valueOf(toInt(snapshot.getValue(0.95))), //

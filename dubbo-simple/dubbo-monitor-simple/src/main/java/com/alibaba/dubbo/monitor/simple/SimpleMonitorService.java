@@ -66,7 +66,7 @@ public class SimpleMonitorService implements MonitorService {
 	private static final Logger logger = LoggerFactory.getLogger(SimpleMonitorService.class);
 
 	private static final String[] types = { SUCCESS, FAILURE, ELAPSED, CONCURRENT, MAX_ELAPSED, MAX_CONCURRENT,
-			PERCENT75_KEY, PERCENT90_KEY, PERCENT95_KEY, PERCENT98_KEY, PERCENT99_KEY, PERCENT999_KEY };
+			PERCENT50_KEY, PERCENT75_KEY, PERCENT90_KEY, PERCENT95_KEY, PERCENT98_KEY, PERCENT99_KEY, PERCENT999_KEY };
 
 	private static final String POISON_PROTOCOL = "poison";
 
