@@ -31,12 +31,12 @@
 			<version>${project.parent.version}</version>
 			<scope>test</scope>
 		</dependency>
-		
+
 		<!-- monitor libs -->
 		<dependency>
-			<groupId>io.dropwizard.metrics</groupId>
+			<groupId>com.codahale.metrics</groupId>
 			<artifactId>metrics-core</artifactId>
-			<version>3.1.2</version>
+			<version>3.0.2</version>
 		</dependency>
 	</dependencies>
 </project>

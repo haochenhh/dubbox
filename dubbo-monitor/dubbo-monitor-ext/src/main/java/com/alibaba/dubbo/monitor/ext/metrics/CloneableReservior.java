@@ -9,7 +9,6 @@ import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.ThreadLocalRandom;
 import com.codahale.metrics.UniformReservoir;
-import com.codahale.metrics.UniformSnapshot;
 
 public class CloneableReservior implements Reservoir {
 	private static final int DEFAULT_SIZE = 1028;
@@ -46,14 +45,6 @@ public class CloneableReservior implements Reservoir {
 		this.values = new AtomicLongArray(v.length());
 		for (int i = 0; i < v.length(); i++) {
 			values.set(i, v.get(i));
-		}
-		count.set(c);
-	}
-
-	public CloneableReservior(int size, int c, long[] v) {
-		this.values = new AtomicLongArray(size);
-		for (int i = 0; i < v.length; i++) {
-			values.set(i, v[i]);
 		}
 		count.set(c);
 	}
@@ -104,7 +95,7 @@ public class CloneableReservior implements Reservoir {
 		for (int i = 0; i < s; i++) {
 			copy.add(values.get(i));
 		}
-		return new UniformSnapshot(copy);
+		return new Snapshot(copy);
 	}
 
 }
